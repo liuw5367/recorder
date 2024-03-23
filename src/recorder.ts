@@ -1,4 +1,5 @@
 import { getErrorMessage, initUserMedia } from './browser'
+import { calculateAudioDuration } from './utils'
 
 export interface OnProgressListener {
   (bufferList: Float32Array[], sampleRate: number): void
@@ -41,6 +42,8 @@ export class Recorder {
 
   private isStoped = false
 
+  private dataLength = 0
+
   constructor(options: Partial<RecorderConfig> = {}) {
     this.config = { ...this.config, ...options }
     initUserMedia()
@@ -81,6 +84,8 @@ export class Recorder {
         }
 
         this.onProgress?.(list, this.config.sampleRate)
+
+        this.dataLength += (list[0]?.length || 0)
 
         if (this.config.cacheData) {
           if (this.buffers.length === 0) {
@@ -174,6 +179,7 @@ export class Recorder {
 
   public resetBuffer = () => {
     this.buffers = []
+    this.dataLength = 0
   }
 
   public getConfig = () => {
@@ -186,5 +192,9 @@ export class Recorder {
 
   public setOnProgressListener = (listener?: OnProgressListener) => {
     this.onProgress = listener
+  }
+
+  public getDuration() {
+    return calculateAudioDuration(this.dataLength, this.config.sampleRate)
   }
 }

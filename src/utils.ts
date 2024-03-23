@@ -10,6 +10,41 @@ export function isLittleEndian(): boolean {
 }
 
 /**
+ * Calculates the duration of an audio file based on its length and sample rate.
+ *
+ * @param {number} length - The length of the audio file in bytes.
+ * @param {number} sampleRate - The sample rate of the audio file in Hz.
+ * @return {number} The duration of the audio file in milliseconds.
+ */
+export function calculateAudioDuration(length: number, sampleRate: number) {
+  return Math.round(Number((length / sampleRate * 1000)))
+}
+
+/**
+ * Formats a given duration in milliseconds into a string representation of time in the format "mm:ss".
+ *
+ * @param {number} duration - The duration in milliseconds to be formatted.
+ * @return {string} The formatted time string in the format "mm:ss".
+ */
+export function formatDuration(duration: number) {
+  function formatNumber(value: number) {
+    if (value < 10) {
+      return `0${value}`
+    }
+    return value
+  }
+
+  function formatTimeValue(value: number) {
+    value = Math.floor(value / 1000)
+    const minute = Math.floor(value / 60)
+    const second = value % 60
+    return `${formatNumber(minute)}:${formatNumber(second)}`
+  }
+
+  return formatTimeValue(duration)
+}
+
+/**
  * A function to convert a float32 value to an int8 value within the range of [0, 255].
  *
  * @param {number} data - the float32 value to be converted

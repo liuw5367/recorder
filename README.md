@@ -6,8 +6,6 @@
     A simple browser recording tool.
     Functions for simple processing of PCM and WAV data.
   </p>
-  <p>
-  </p>
 
 <!-- Badges -->
 
@@ -26,7 +24,7 @@
 <!-- [![-commit][-src]][-herf] -->
 
 <h4>
-    <a href="https://liuw5367.github.io/react-starter/">View Demo</a>
+    <a href="https://liuw5367.github.io/recorder/">View Demo</a>
   <span> · </span>
     <a href="https://www.jsdocs.io/package/@lw6/recorder">Documentation</a>
   <span> · </span>
@@ -73,12 +71,12 @@ recorder.pause();
 recorder.resume();
 
 recorder.stop();
+recorder.getDuration();
 ```
 
 ## Roadmap
 
-- [ ] Calculate the duration of the audio.
-- [ ] Speech To Text Example
+- [ ] Speech To Text
 
 ## Contributing
 

@@ -1,7 +1,7 @@
 import 'virtual:uno.css'
 import './index.css'
 
-import { Recorder, compressFloat32, createWavBlob, float32Buffer2wav, getAudioInputDevices, mergeMultiChannelBuffer2Wav, sampleRateConverter } from '@lw6/recorder'
+import { Recorder, compressFloat32, createWavBlob, float32Buffer2wav, formatDuration, getAudioInputDevices, mergeMultiChannelBuffer2Wav, sampleRateConverter } from '@lw6/recorder'
 import { useEffect, useRef, useState } from 'react'
 
 function App() {
@@ -19,6 +19,9 @@ function App() {
   const [wavUrl, setWavUrl] = useState<string>()
 
   const [wavUrlList, setWavUrlList] = useState<string[]>([])
+
+  const [duration, setDuration] = useState(0)
+  const [formatedDuration, setFormatedDuration] = useState('00:00')
 
   useEffect(() => {
     getDevices()
@@ -43,6 +46,19 @@ function App() {
       })
     }
   }, [wavUrlList])
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | undefined
+    if (recording) {
+      interval = setInterval(() => {
+        const value = recorderRef?.current?.getDuration() || 0
+        setFormatedDuration(formatDuration(value))
+      }, 333)
+    }
+    return () => {
+      interval != null && clearInterval(interval)
+    }
+  }, [recording])
 
   function getDevices() {
     getAudioInputDevices().then((devices) => {
@@ -102,6 +118,11 @@ function App() {
     recorderRef.current?.stop()
     setRecording(false)
 
+    const duration = recorderRef.current?.getDuration() || 0
+    setDuration(duration)
+    setFormatedDuration(formatDuration(duration))
+    console.log('duration:', duration, formatDuration(duration))
+
     const buffer = buffersRef.current
     // const buffer = recorderRef.current?.getBuffers() || []
     single(buffer)
@@ -156,7 +177,7 @@ function App() {
       )}
 
       <div className="space-x-2 flex items-center">
-
+        <span>{formatedDuration}</span>
         <button onClick={handleStartClick} disabled={recording}>Start</button>
         <button onClick={handlePauseClick} disabled={!recording || paused}>Pause</button>
         <button onClick={handleResumeClick} disabled={!recording || !paused}>Resume</button>
@@ -164,7 +185,10 @@ function App() {
       </div>
 
       {wavUrl && (
-        <div className="space-x-2">
+        <div className="space-x-2 flex items-center">
+          <span>duration:</span>
+          <span>{duration}</span>
+          <span>ms</span>
           {wavUrl && <audio controls src={wavUrl} />}
         </div>
       )}
