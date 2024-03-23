@@ -77,7 +77,8 @@ recorder.stop();
 
 ## Roadmap
 
-- [ ] ...
+- [ ] Calculate the duration of the audio.
+- [ ] Speech To Text Example
 
 ## Contributing
 

@@ -36,6 +36,14 @@ function App() {
     }
   }, [wavUrl])
 
+  useEffect(() => {
+    return () => {
+      wavUrlList.forEach((url) => {
+        URL.revokeObjectURL(url)
+      })
+    }
+  }, [wavUrlList])
+
   function getDevices() {
     getAudioInputDevices().then((devices) => {
       console.log('audio input devices:', devices)
@@ -53,6 +61,7 @@ function App() {
     const recorder = new Recorder({
       numberOfChannels: channels,
       deviceId: selectedDeviceId,
+      // cacheData: true
     })
     recorderRef.current = recorder
 
@@ -94,21 +103,15 @@ function App() {
     setRecording(false)
 
     const buffer = buffersRef.current
+    // const buffer = recorderRef.current?.getBuffers() || []
     single(buffer)
     multi(buffer)
   }
 
   function single(buffer: Float32Array[][]) {
-    console.log('stop', buffer)
-
     const wav = mergeMultiChannelBuffer2Wav(buffer, sampleRate)
-    console.log('wav', wav)
-
     const blob = createWavBlob(wav)
     const url = URL.createObjectURL(blob)
-
-    console.log('url', [url])
-
     setWavUrl(url)
   }
 
@@ -123,50 +126,41 @@ function App() {
   }
 
   return (
-    <div className="space-y-2 p-4">
-      <div className="space-x-2">
-        <span>Audio input devices:</span>
-        <select
-          className="py-2 px-3 rounded"
-          onChange={(e) => {
-            const value = e.target.value
-            if (value === 'default') {
-              setSelectedDeviceId(undefined)
-            }
-            else {
-              setSelectedDeviceId(value)
-            }
-          }}
-        >
-          {devices.map((item) => (
-            <option key={item.deviceId} value={item.deviceId}>{item.label}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-x-2">
-        <span>
-          SampleRate:
-        </span>
-        <span>
-          {sampleRate}
-        </span>
-      </div>
+    <div className="py-4 space-y-4 flex flex-col items-center w-full">
 
       <div className="space-x-2">
         <span>Channels: </span>
-        <select className="py-2 px-3 rounded" onChange={(e) => setChannels(e.target.value as any)}>
+        <select className="py-1.5 px-3 rounded" onChange={(e) => setChannels(e.target.value as any)}>
           <option value={1}>1</option>
           <option value={2}>2</option>
         </select>
       </div>
 
+      {devices.length > 0 && (
+        <div className="space-x-2">
+          <span>Audio input devices:</span>
+          <select
+            className="py-2 px-3 rounded"
+            aria-placeholder="Audio input devices"
+            onChange={(e) => {
+              const value = e.target.value
+              setSelectedDeviceId(value)
+            }}
+          >
+            <option value={undefined}>Select a recording device</option>
+            {devices.map((item) => (
+              <option key={item.deviceId} value={item.deviceId}>{item.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="space-x-2 flex items-center">
 
-        <button onClick={handleStartClick} disabled={recording}>开始</button>
-        <button onClick={handlePauseClick} disabled={!recording || paused}>暂停</button>
-        <button onClick={handleResumeClick} disabled={!recording || !paused}>继续</button>
-        <button onClick={handleStopClick} disabled={!recording}>结束</button>
+        <button onClick={handleStartClick} disabled={recording}>Start</button>
+        <button onClick={handlePauseClick} disabled={!recording || paused}>Pause</button>
+        <button onClick={handleResumeClick} disabled={!recording || !paused}>Resume</button>
+        <button onClick={handleStopClick} disabled={!recording}>Stop</button>
       </div>
 
       {wavUrl && (
@@ -184,10 +178,8 @@ function App() {
                 {index}
               </div>
               <audio controls src={url} />
-
             </div>
-          ),
-          )}
+          ))}
         </div>
       )}
 
