@@ -1,9 +1,50 @@
+/**
+ * Checks if the system is little endian by creating a buffer and checking its value.
+ *
+ * @return {boolean} true if the system is little endian, false otherwise
+ */
 export function isLittleEndian(): boolean {
   const buffer = new ArrayBuffer(2)
   new DataView(buffer).setInt16(0, 256, true)
   return new Int16Array(buffer)[0] === 256
 }
 
+/**
+ * A function to convert a float32 value to an int8 value within the range of [0, 255].
+ *
+ * @param {number} data - the float32 value to be converted
+ * @return {number} the int8 value within the range of [0, 255]
+ */
+export function float32Value2Int8(data: number): number {
+  // 范围[-1, 1]
+  const s = Math.max(-1, Math.min(1, data))
+  // 8位采样位划分成2^8=256份，它的范围是0-255;
+  // 对于8位的话，负数*128，正数*127，然后整体向上平移128(+128)，即可得到[0,255]范围的数据。
+  let val = s < 0 ? s * 128 : s * 127
+  val = +val + 128
+
+  return val
+}
+
+/**
+ * Converts a float32 value to a 16-bit signed integer.
+ *
+ * @param {number} data - the input float32 value
+ * @return {number} the converted 16-bit signed integer value
+ */
+export function float32Value2Int16(data: number): number {
+  const s = Math.max(-1, Math.min(1, data))
+  // 16位的划分的是2^16=65536份，范围是-32768到32767
+  // 因为我们收集的数据范围在[-1,1]，那么你想转换成16位的话，只需要对负数*32768,对正数*32767,即可得到范围在[-32768,32767]的数据。
+  return s < 0 ? s * 0x80_00 : s * 0x7F_FF
+}
+
+/**
+ * Compresses an array of Uint8Arrays into a single Uint8Array.
+ *
+ * @param {Uint8Array[]} buffer - an array of Uint8Arrays to compress
+ * @return {Uint8Array} a single Uint8Array containing the compressed data
+ */
 export function compressUint8(buffer: Uint8Array[]): Uint8Array {
   if (buffer.length === 0) {
     return new Uint8Array(0)
@@ -27,7 +68,13 @@ export function compressUint8(buffer: Uint8Array[]): Uint8Array {
   return result
 }
 
-export function compress(buffer: Float32Array[]): Float32Array {
+/**
+ * Compresses an array of Float32Arrays into a single Float32Array.
+ *
+ * @param {Float32Array[]} buffer - Array of Float32Arrays to compress
+ * @return {Float32Array} The compressed Float32Array
+ */
+export function compressFloat32(buffer: Float32Array[]): Float32Array {
   if (buffer.length === 0) {
     return new Float32Array(0)
   }
@@ -51,7 +98,10 @@ export function compress(buffer: Float32Array[]): Float32Array {
 }
 
 /**
- * 合并多声道数据
+ * Merge multiple channels' buffers into a single Float32Array.
+ *
+ * @param {Float32Array[]} channels - An array of Float32Array representing the channels to be merged.
+ * @return {Float32Array} The merged Float32Array buffer.
  */
 export function mergeMultiChannelsBuffer(channels: Float32Array[]): Float32Array {
   if (channels.length === 1) {
@@ -77,41 +127,47 @@ export function mergeMultiChannelsBuffer(channels: Float32Array[]): Float32Array
   return mergedData
 }
 
+/**
+ * Encodes a Float32Array into a DataView with the specified bit depth and endianness.
+ *
+ * @param {Float32Array} bytes - The array of floating-point values to encode.
+ * @param {number} [bitDepth] - The bit depth of the encoding. Must be 8 or 16.
+ * @param {boolean} [littleEndian] - The endianness of the encoding.
+ * @return {DataView} - The encoded DataView.
+ * @throws {Error} - If bitDepth is not 8 or 16.
+ */
 export function encodePCM(bytes: Float32Array, bitDepth = 16, littleEndian = isLittleEndian()): DataView {
-  let offset = 0
   const dataLength = bytes.length * (bitDepth / 8)
   const buffer = new ArrayBuffer(dataLength)
-  const data = new DataView(buffer)
+  const view = new DataView(buffer)
 
   // 写入采样数据
   if (bitDepth === 8) {
+    let offset = 0
     for (let i = 0; i < bytes.length; i++, offset++) {
-      // 范围[-1, 1]
-      const s = Math.max(-1, Math.min(1, bytes[i]))
-      // 8位采样位划分成2^8=256份，它的范围是0-255;
-      // 对于8位的话，负数*128，正数*127，然后整体向上平移128(+128)，即可得到[0,255]范围的数据。
-      let val = s < 0 ? s * 128 : s * 127
-      val = +val + 128
-      data.setInt8(offset, val)
+      view.setInt8(offset, float32Value2Int8(bytes[i]))
     }
   }
   else if (bitDepth === 16) {
+    let offset = 0
     for (let i = 0; i < bytes.length; i++, offset += 2) {
-      const s = Math.max(-1, Math.min(1, bytes[i]))
-      // 16位的划分的是2^16=65536份，范围是-32768到32767
-      // 因为我们收集的数据范围在[-1,1]，那么你想转换成16位的话，只需要对负数*32768,对正数*32767,即可得到范围在[-32768,32767]的数据。
-      data.setInt16(offset, s < 0 ? s * 0x80_00 : s * 0x7F_FF, littleEndian)
+      view.setInt16(offset, float32Value2Int16(bytes[i]), littleEndian)
     }
   }
   else {
     throw new Error('bitDepth must be 8 or 16')
   }
 
-  return data
+  return view
 }
 
 /**
- * 采样率转换
+ * Resamples the given audio data from one sample rate to another.
+ *
+ * @param {Float32Array[]} data - Array of Float32Array buffers representing audio data in different channels
+ * @param {number} inputSampleRate - The sample rate of the input audio data
+ * @param {number} outputSampleRate - The sample rate to resample the audio data to (default is 16,000)
+ * @return {Promise<Float32Array[]>} A Promise that resolves with the resampled audio data in Float32Array format
  */
 export function audioResample(
   data: Float32Array[],
@@ -151,64 +207,65 @@ export function audioResample(
 }
 
 /**
- * 采样率转换
+ * Sample rate converter function that takes an input signal, its sample rate, and an optional output sample rate, and returns the converted signal.
+ *
+ * @param {Float32Array} input - the input signal to be converted
+ * @param {number} inputSampleRate - the sample rate of the input signal
+ * @param {number} [outputSampleRate] - the desired sample rate of the output signal, default is 16000
+ * @return {Float32Array} the converted signal with the specified sample rate
  */
 export function sampleRateConverter(input: Float32Array, inputSampleRate: number, outputSampleRate: number = 16_000): Float32Array {
-  // 输入为空检验
   if (input == null) {
-    throw new Error('输入音频为空数组')
+    throw new Error('input data is null')
   }
 
-  // 采样率合法检验
   if (inputSampleRate <= 1 || outputSampleRate <= 1) {
-    throw new Error('输入或输出音频采样率不合法')
+    throw new Error('sample rate must be greater than 1')
   }
 
   if (inputSampleRate === outputSampleRate) {
     return input
   }
 
-  // 输入音频长度
-  const len = input.length
+  const inputLength = input.length
+  const outputLength = Math.round((inputLength * outputSampleRate) / inputSampleRate)
 
-  // 输出音频长度
-  const outlen = Math.round((len * outputSampleRate) / inputSampleRate)
+  const output = new Float32Array(outputLength)
+  const S = new Float32Array(inputLength)
+  const T = new Float32Array(outputLength)
 
-  const output = new Float32Array(outlen)
-  const S = new Float32Array(len)
-  const T = new Float32Array(outlen)
   // 输入信号归一化
-  for (let i = 0; i < len; i++) {
+  for (let i = 0; i < inputLength; i++) {
     S[i] = input[i] / 32_768
   }
 
   // 计算输入输出个数比
-  const f = (len - 1) / (outlen - 1)
+  const f = (inputLength - 1) / (outputLength - 1)
   let fn = 0
   let ceil = 0
   let floor = 0
   output[0] = input[0]
 
-  for (let n = 1; n < outlen; n++) {
+  for (let n = 1; n < outputLength; n++) {
     // 计算输出对应输入的相邻下标
     fn = f * n
     ceil = Math.ceil(fn)
     floor = Math.floor(fn)
 
     // 防止下标溢出
-    if (ceil >= len && floor < len) {
+    if (ceil >= inputLength && floor < inputLength) {
       ceil = floor
     }
-    else if (ceil >= len && floor >= len) {
-      ceil = len - 1
-      floor = len - 1
+    else if (ceil >= inputLength && floor >= inputLength) {
+      ceil = inputLength - 1
+      floor = inputLength - 1
     }
 
     // 相似三角形法计算输出点近似值
     T[n] = S[floor] + (fn - floor) * (S[ceil] - S[floor])
   }
 
-  for (let i = 1; i < outlen; i++) {
+  for (let i = 1; i < outputLength; i++) {
     output[i] = T[i] * 32_768
   }
 
@@ -216,7 +273,12 @@ export function sampleRateConverter(input: Float32Array, inputSampleRate: number
 }
 
 /**
- * 采样率转换
+ * Convert the input data from one sample rate to another using a simple sample rate conversion algorithm.
+ *
+ * @param {Uint8Array} data - The input data to be converted
+ * @param {number} inputSampleRate - The input sample rate of the data
+ * @param {number} [outputSampleRate] - the desired sample rate of the output signal, default is 16000
+ * @return {Uint8Array} The converted data at the specified output sample rate
  */
 export function sampleRateConverterSimple(data: Uint8Array, inputSampleRate: number, outputSampleRate = 16_000): Uint8Array {
   const rate = inputSampleRate / outputSampleRate

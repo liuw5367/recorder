@@ -10,27 +10,11 @@ export interface RecorderConfig {
   numberOfChannels: number
 
   sampleRate: number
-  bitDepth: number
 
   cacheData: boolean
 }
 
-export const sampleRate = 16_000
-
 export class Recorder {
-  private onProgress?: OnProgressListener
-
-  private readonly config: RecorderConfig = {
-    deviceId: undefined,
-
-    numberOfChannels: 1,
-
-    sampleRate: 16_000,
-    bitDepth: 16,
-
-    cacheData: false,
-  }
-
   private context?: AudioContext
 
   private recorder?: ScriptProcessorNode
@@ -39,11 +23,23 @@ export class Recorder {
 
   private audioInput?: MediaStreamAudioSourceNode
 
+  private onProgress?: OnProgressListener
+
+  private readonly config: RecorderConfig = {
+    deviceId: undefined,
+
+    numberOfChannels: 1,
+
+    sampleRate: 16_000,
+
+    cacheData: false,
+  }
+
   private buffers: Float32Array[][] = []
 
   private isPaused = false
 
-  private isDestroyed = false
+  private isStoped = false
 
   constructor(options: Partial<RecorderConfig> = {}) {
     this.config = { ...this.config, ...options }
@@ -56,7 +52,7 @@ export class Recorder {
    * @param onError 错误信息
    */
   public open = async (onSuccess?: (value: [number, number]) => void, onError?: (msg: string) => void) => {
-    await this.destroy()
+    await this.stop()
     this.reset()
 
     const start = new Promise<[number, number]>((resolve, reject) => {
@@ -148,10 +144,13 @@ export class Recorder {
 
   public stop = async () => {
     this.isPaused = false
-    this.isDestroyed = true
+    this.isStoped = true
 
     this.audioInput?.disconnect()
+    this.audioInput = undefined
+
     this.recorder?.disconnect()
+    this.recorder = undefined
 
     if (this.stream && this.stream.getTracks) {
       for (const track of this.stream.getTracks()) {
@@ -166,16 +165,9 @@ export class Recorder {
     }
   }
 
-  public destroy = async () => {
-    if (this.isDestroyed) {
-      return
-    }
-    await this.stop()
-  }
-
   private reset = () => {
     this.isPaused = false
-    this.isDestroyed = false
+    this.isStoped = false
     this.resetBuffer()
   }
 

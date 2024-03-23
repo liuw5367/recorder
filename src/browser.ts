@@ -12,6 +12,11 @@ export function createAudioContext() {
   return new (window.AudioContext || window.webkitAudioContext)()
 }
 
+/**
+ * Initializes the user media functionality if it is not already available.
+ *
+ * @return {void} This function does not return a value.
+ */
 export function initUserMedia() {
   if (navigator.mediaDevices === undefined) {
     (navigator as any).mediaDevices = {}

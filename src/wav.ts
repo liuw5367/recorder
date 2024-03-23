@@ -1,17 +1,36 @@
 import { getAudioContext } from './browser'
-import { compress, encodePCM, isLittleEndian, mergeMultiChannelsBuffer, sampleRateConverter } from './utils'
+import { compressFloat32, float32Value2Int16, float32Value2Int8, isLittleEndian, mergeMultiChannelsBuffer, sampleRateConverter } from './utils'
 
-export function createWavHeaderBuffer(length: number, sampleRate = 16_000, numberOfChannels = 1, bitDepth = 16): ArrayBuffer {
+/**
+ * Creates a WAV header buffer with the specified parameters.
+ *
+ * @param {number} length - The length of the WAV file in bytes.
+ * @param {number} sampleRate - The sample rate of the audio (default is 16,000)
+ * @param {number} numberOfChannels - The number of audio channels (default is 1)
+ * @param {number} bitDepth - The bit depth of the audio (default is 16)
+ * @param {boolean} [littleEndian] - The byte order of the audio.
+ * @return {ArrayBuffer} The WAV header buffer.
+ */
+export function createWavHeaderBuffer(length: number, sampleRate = 16_000, numberOfChannels = 1, bitDepth = 16, littleEndian = isLittleEndian()): ArrayBuffer {
   const buffer = new ArrayBuffer(44)
   const view = new DataView(buffer)
 
-  writeHeader(view, length, sampleRate, numberOfChannels, bitDepth)
+  writeWavHeader(view, length, sampleRate, numberOfChannels, bitDepth, littleEndian)
 
   return view.buffer
 }
 
-export function writeHeader(view: DataView, length: number, sampleRate = 16_000, numberOfChannels = 1, bitDepth = 16) {
-  const littleEndian = isLittleEndian()
+/**
+ * Writes the header for a WAVE audio file format in the DataView.
+ *
+ * @param {DataView} view - The DataView to write the header to
+ * @param {number} length - The length of the audio data in bytes
+ * @param {number} sampleRate - The sample rate of the audio (default is 16,000)
+ * @param {number} numberOfChannels - The number of audio channels (default is 1)
+ * @param {number} bitDepth - The bit depth of the audio (default is 16)
+ * @param {boolean} littleEndian - Flag indicating whether the system is little endian
+ */
+export function writeWavHeader(view: DataView, length: number, sampleRate = 16_000, numberOfChannels = 1, bitDepth = 16, littleEndian = isLittleEndian()) {
   // RIFF identifier
   writeString(view, 0, 'RIFF')
   // RIFF chunk length
@@ -40,7 +59,19 @@ export function writeHeader(view: DataView, length: number, sampleRate = 16_000,
   view.setUint32(40, length, littleEndian)
 }
 
-export function audioBuffer2Wav(audioBuffer: AudioBuffer, bitDepth = 16): DataView {
+/**
+ * Converts an AudioBuffer to a WAV DataView.
+ *
+ * @param {AudioBuffer} audioBuffer - the input AudioBuffer to convert
+ * @param {number} bitDepth - the bit depth of the output WAV (default: 16)
+ * @param {boolean} littleEndian - indicates whether the output WAV is little endian (default: determined by system)
+ * @return {DataView} the converted WAV DataView
+ */
+export function audioBuffer2Wav(
+  audioBuffer: AudioBuffer,
+  bitDepth = 16,
+  littleEndian = isLittleEndian(),
+): DataView {
   const numberOfChannels = audioBuffer.numberOfChannels
   const sampleRate = audioBuffer.sampleRate
 
@@ -50,46 +81,113 @@ export function audioBuffer2Wav(audioBuffer: AudioBuffer, bitDepth = 16): DataVi
   }
 
   const buffers = mergeMultiChannelsBuffer(channelsBuffer)
-  return floatBuffer2wav(buffers, numberOfChannels, sampleRate, bitDepth)
+  return float32Buffer2wav(buffers, numberOfChannels, sampleRate, bitDepth, littleEndian)
 }
 
+/**
+ * Converts a Float32Array buffer to a DataView representing a WAV audio file.
+ *
+ * @param {Float32Array} data - The input buffer to be converted
+ * @param {number} numberOfChannels - The number of audio channels (default is 1)
+ * @param {number} sampleRate - The sample rate of the audio (default is 16,000)
+ * @param {number} bitDepth - The bit depth of the audio (default is 16)
+ * @param {boolean} [littleEndian] - Whether the WAV audio file should be in little endian format
+ * @return {DataView} The DataView representing the WAV audio file
+ */
+export function float32Buffer2wav(
+  data: Float32Array,
+  numberOfChannels: number = 1,
+  sampleRate: number = 16_000,
+  bitDepth: number = 16,
+  littleEndian = isLittleEndian(),
+): DataView {
+  let array: number[]
+
+  if (bitDepth === 8) {
+    const int8array = new Int8Array(data.length)
+    for (const [i, sample] of data.entries()) {
+      int8array[i] = float32Value2Int8(sample)
+    }
+    array = [...int8array]
+  }
+  else if (bitDepth === 16) {
+    const int16array = new Int16Array(data.length)
+    for (const [i, sample] of data.entries()) {
+      int16array[i] = float32Value2Int16(sample)
+    }
+    array = [...int16array]
+  }
+  else {
+    throw new Error('bitDepth must be 8 or 16')
+  }
+
+  return numberArray2wav(array, numberOfChannels, sampleRate, bitDepth, littleEndian)
+}
+
+/**
+ * Generates a WAV file from an array of numbers.
+ *
+ * @param {number[]} data - The array of numbers to convert to WAV format
+ * @param {number} numberOfChannels - The number of audio channels (default is 1)
+ * @param {number} sampleRate - The sample rate of the audio (default is 16,000)
+ * @param {number} bitDepth - The number of bits per sample (default is 16)
+ * @param {boolean} littleEndian - Flag indicating if the data is in little-endian format
+ * @return {ArrayBuffer} The generated WAV file as an ArrayBuffer
+ */
 export function numberArray2wav(
   data: number[],
   numberOfChannels: number = 1,
   sampleRate: number = 16_000,
   bitDepth: number = 16,
-): DataView {
+  littleEndian = isLittleEndian(),
+) {
+  const offset = 44
+  const length = (data.length * bitDepth) / 8
+
+  const buffer = new ArrayBuffer(offset + length)
+  const view = new DataView(buffer)
+
+  writeWavHeader(view, length, sampleRate, numberOfChannels, bitDepth)
+
+  const dataView = new DataView(buffer, offset)
+
   if (bitDepth === 8) {
-    const buffer = new Float32Array([...new Int8Array(data)])
-    return floatBuffer2wav(buffer, numberOfChannels, sampleRate, bitDepth)
+    for (const [i, sample] of data.entries()) {
+      dataView.setInt8(i, sample)
+    }
   }
   else if (bitDepth === 16) {
-    const buffer = new Float32Array([...new Int16Array(data)])
-    return floatBuffer2wav(buffer, numberOfChannels, sampleRate, bitDepth)
+    for (const [i, sample] of data.entries()) {
+      dataView.setInt16(i * 2, sample, littleEndian)
+    }
   }
   else {
     throw new Error('bitDepth must be 8 or 16')
   }
+
+  return view
 }
 
-export function floatBuffer2wav(
-  data: Float32Array,
-  numberOfChannels: number = 1,
-  sampleRate: number = 16_000,
-  bitDepth: number = 16,
+/**
+ * Converts a Uint8Array buffer to a WAV DataView with the specified sample rate, number of channels, and bit depth.
+ *
+ * @param {Uint8Array} data - The input Uint8Array buffer.
+ * @param {number} sampleRate - The sample rate of the WAV data. Defaults to 16,000.
+ * @param {number} numberOfChannels - The number of channels in the WAV data. Defaults to 1.
+ * @param {number} bitDepth - The bit depth of the WAV data. Defaults to 16.
+ * @return {DataView} The DataView representing the WAV data.
+ */
+export function uint8Buffer2wav(
+  data: Uint8Array,
+  sampleRate = 16_000,
+  numberOfChannels = 1,
+  bitDepth = 16,
 ): DataView {
-  const buffer = encodePCM(data, bitDepth).buffer
-
-  return buffer2wav(new Uint8Array(buffer), numberOfChannels, sampleRate, bitDepth)
-}
-
-export function buffer2wav(data: Uint8Array, sampleRate = 16_000, numChannels = 1, bitDepth = 16): DataView {
   const buffer = new ArrayBuffer(44 + data.length)
   const view = new DataView(buffer)
 
-  writeHeader(view, data.length, sampleRate, numChannels, bitDepth)
+  writeWavHeader(view, data.length, sampleRate, numberOfChannels, bitDepth)
 
-  // write PCM data
   for (const [i, datum] of data.entries()) {
     view.setUint8(44 + i, datum)
   }
@@ -97,17 +195,36 @@ export function buffer2wav(data: Uint8Array, sampleRate = 16_000, numChannels = 
   return view
 }
 
+/**
+ * Writes a string into a DataView starting at a specified offset.
+ *
+ * @param {DataView} view - The DataView to write the string into
+ * @param {number} offset - The offset in the DataView where writing starts
+ * @param {string} content - The string content to write into the DataView
+ */
 function writeString(view: DataView, offset: number, content: string) {
   for (let i = 0; i < content.length; i++) {
     view.setUint8(offset + i, content.charCodeAt(i))
   }
 }
 
+/**
+ * Creates a Blob of type 'audio/wav' from the provided BlobPart view.
+ *
+ * @param {BlobPart} view - the BlobPart to be converted into a Blob of type 'audio/wav'
+ * @return {Blob} a Blob of type 'audio/wav'
+ */
 export function createWavBlob(view: BlobPart): Blob {
   return new Blob([view], { type: 'audio/wav' })
 }
 
-export function readWavAsAudioBuffer(blob: Blob): Promise<AudioBuffer> {
+/**
+ * Reads a WAV file from a Blob and converts it to an AudioBuffer using promises.
+ *
+ * @param {Blob} blob - The Blob containing the WAV file data.
+ * @return {Promise<AudioBuffer>} A Promise that resolves to an AudioBuffer representing the WAV file.
+ */
+export function readWav2AudioBuffer(blob: Blob): Promise<AudioBuffer> {
   return new Promise((resolve, reject) => {
     blob
       .arrayBuffer()
@@ -123,9 +240,15 @@ export function readWavAsAudioBuffer(blob: Blob): Promise<AudioBuffer> {
   })
 }
 
+/**
+ * Takes a WAV file as input and returns a promise with an array of Float32Arrays representing the audio channels and the sample rate.
+ *
+ * @param {Blob} wav - The input WAV file
+ * @return {Promise<[Float32Array[], number]>} A promise with an array of Float32Arrays representing audio channels and the sample rate
+ */
 export function readWav2Buffer(wav: Blob): Promise<[Float32Array[], number]> {
   return new Promise((resolve, reject) => {
-    readWavAsAudioBuffer(wav)
+    readWav2AudioBuffer(wav)
       .then((audioBuffer) => {
         const channels = audioBuffer.numberOfChannels
         const sampleRate = audioBuffer.sampleRate
@@ -143,7 +266,10 @@ export function readWav2Buffer(wav: Blob): Promise<[Float32Array[], number]> {
 }
 
 /**
- * 分离多声道音频为多个单声道音频
+ * Splits a multi-channel WAV blob into multiple single-channel WAV blobs.
+ *
+ * @param {Blob} blob - The multi-channel WAV blob to split.
+ * @return {Promise<Blob[]>} A promise that resolves to an array of single-channel WAV blobs.
  */
 export function splitMultiWavBlob(blob: Blob): Promise<Blob[]> {
   return new Promise((resolve, reject) => {
@@ -165,10 +291,13 @@ export function splitMultiWavBlob(blob: Blob): Promise<Blob[]> {
 }
 
 /**
- * @param data 数组类型，Float32Array[] 为单声道数据
- * @param sampleRate 16k
- * @param outputSampleRate 16k
- * @param outputBitDepth 16
+ * Merge multiple channel buffers into a single WAV file buffer.
+ *
+ * @param {Float32Array[][]} data - The multi-channel audio data to merge
+ * @param {number} sampleRate - The sample rate of the input audio data (default is 16,000)
+ * @param {number} outputSampleRate - The sample rate of the output audio data (default is 16,000)
+ * @param {number} outputBitDepth - The bit depth of the output audio data (default is 16)
+ * @return {DataView} The merged WAV file buffer
  */
 export function mergeMultiChannelBuffer2Wav(
   data: Float32Array[][],
@@ -176,26 +305,28 @@ export function mergeMultiChannelBuffer2Wav(
   outputSampleRate = 16_000,
   outputBitDepth: number = 16,
 ): DataView {
-  const channelsBuffer = data.map((inputBuffer) => sampleRateConverter(compress(inputBuffer), sampleRate, outputSampleRate))
-  // 合并多声道数据
-  const buffers = mergeMultiChannelsBuffer(channelsBuffer)
-  // 转 wav
   const numberOfChannels = data.length
-  const wav = floatBuffer2wav(buffers, numberOfChannels, outputSampleRate, outputBitDepth)
-  // console.log('merged wav: channel:', numberOfChannels, wav)
-  return wav
+
+  const channelsBuffer = data.map((buffer) => sampleRateConverter(compressFloat32(buffer), sampleRate, outputSampleRate))
+
+  const buffers = mergeMultiChannelsBuffer(channelsBuffer)
+  return float32Buffer2wav(buffers, numberOfChannels, outputSampleRate, outputBitDepth)
 }
 
 /**
- * 合成多个单声道 wav 文件为一个多声道 wav 文件
+ * Merges multiple WAV blobs into a single Blob with the specified output sample rate and bit depth.
+ *
+ * @param {Blob[]} blobs - Array of input WAV blobs to be merged
+ * @param {number} outputSampleRate - The sample rate of the output WAV Blob (default is 16,000)
+ * @param {number} bitDepth - The bit depth of the output WAV Blob (default is 16)
+ * @return {Promise<Blob>} A Promise that resolves to the merged WAV Blob
  */
 export async function mergeWavBlob(blobs: Blob[], outputSampleRate = 16_000, bitDepth = 16): Promise<Blob> {
-  // 加载单声道 wav 文件
-  const loadWav = async (blob: Blob) => {
-    return await readWavAsAudioBuffer(blob)
+  const loadWavAudioBuffer = async (blob: Blob) => {
+    return await readWav2AudioBuffer(blob)
   }
 
-  const audioBuffers = await Promise.all(blobs.map((blob) => loadWav(blob)))
+  const audioBuffers = await Promise.all(blobs.map((blob) => loadWavAudioBuffer(blob)))
 
   let numberOfChannels = 0
 
@@ -211,6 +342,6 @@ export async function mergeWavBlob(blobs: Blob[], outputSampleRate = 16_000, bit
   }
 
   const buffers = mergeMultiChannelsBuffer(channelsBuffer)
-  const wav = floatBuffer2wav(buffers, numberOfChannels, outputSampleRate, bitDepth)
+  const wav = float32Buffer2wav(buffers, numberOfChannels, outputSampleRate, bitDepth)
   return createWavBlob(wav)
 }
