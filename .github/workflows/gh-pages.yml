@@ -48,11 +48,21 @@ jobs:
           node-version: lts/*
           cache: pnpm
 
-      - name: Install
+      - name: Install1
         run: pnpm install
 
-      - name: Build
-        run: pnpm --filter example build --base=/${{ env.REPO_NAME }}/
+      - name: Build1
+        run: pnpm build
+
+      - name: Install2
+        run: |
+          cd ./example
+          pnpm install --frozen-lockfile
+
+      - name: Build2
+        run: |
+          cd ./example
+          npx vite build --base=/${{ env.REPO_NAME }}/
 
       - name: Setup Pages
         uses: actions/configure-pages@v3

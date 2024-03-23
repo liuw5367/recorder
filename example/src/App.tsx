@@ -1,7 +1,7 @@
 import 'virtual:uno.css'
 import './index.css'
 
-import { Recorder, compressFloat32, createWavBlob, float32Buffer2wav, getAudioInputDevices, mergeMultiChannelBuffer2Wav, sampleRateConverter } from 'recorder'
+import { Recorder, compressFloat32, createWavBlob, float32Buffer2wav, getAudioInputDevices, mergeMultiChannelBuffer2Wav, sampleRateConverter } from '@lw6/recorder'
 import { useEffect, useRef, useState } from 'react'
 
 function App() {

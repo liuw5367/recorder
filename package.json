@@ -1,9 +1,9 @@
 {
-  "name": "recorder",
+  "name": "@lw6/recorder",
   "type": "module",
   "version": "0.1.0",
   "packageManager": "pnpm@8.15.3",
-  "description": "Recorder",
+  "description": "A simple browser recording tool.",
   "author": "liuw5367 <liuw5367@gmail.com>",
   "license": "MIT",
   "homepage": "https://github.com/liuw5367/recorder#readme",
@@ -11,8 +11,8 @@
     "type": "git",
     "url": "git+https://github.com/liuw5367/recorder.git"
   },
-  "bugs": "https://github.com/liuw5367/liuw5367/issues",
-  "keywords": [],
+  "bugs": "https://github.com/liuw5367/recorder/issues",
+  "keywords": ["recorder", "audio", "browser", "WebAudioAPI", "pcm", "wav", "typescript"],
   "sideEffects": false,
   "exports": {
     ".": {
