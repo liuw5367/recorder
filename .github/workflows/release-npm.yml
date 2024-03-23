@@ -1,4 +1,4 @@
-name: Release
+name: Release NPM
 
 on:
   push:
@@ -7,10 +7,6 @@ on:
 
 jobs:
   release:
-    permissions:
-      id-token: write
-      contents: write
-
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -24,8 +20,16 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: lts/*
+          registry-url: https://registry.npmjs.org
           cache: pnpm
 
-      - run: npx changelogithub
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: PNPM build
+        run: pnpm run build
+
+      - name: Publish to NPM
+        uses: simenandre/publish-with-pnpm@v1
+        with:
+          npm-auth-token: ${{ secrets.NPM_TOKEN }}
