@@ -23,9 +23,6 @@ importers:
       eslint-plugin-format:
         specifier: ^0.1.0
         version: 0.1.0(eslint@8.56.0)
-      esno:
-        specifier: ^4.7.0
-        version: 4.7.0
       lint-staged:
         specifier: ^15.2.2
         version: 15.2.2
@@ -38,6 +35,9 @@ importers:
       simple-git-hooks:
         specifier: ^2.9.0
         version: 2.9.0
+      tsx:
+        specifier: ^4.7.1
+        version: 4.7.1
       typescript:
         specifier: ^5.3.3
         version: 5.3.3
@@ -3914,13 +3914,6 @@ packages:
       text-table: 0.2.0
     transitivePeerDependencies:
       - supports-color
-    dev: true
-
-  /esno@4.7.0:
-    resolution: {integrity: sha512-81owrjxIxOwqcABt20U09Wn8lpBo9K6ttqbGvQcB3VYNLJyaV1fvKkDtpZd3Rj5BX3WXiGiJCjUevKQGNICzJg==}
-    hasBin: true
-    dependencies:
-      tsx: 4.7.1
     dev: true
 
   /espree@9.6.1:

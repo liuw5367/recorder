@@ -28,7 +28,7 @@ export function initUserMedia() {
       const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia
 
       if (!getUserMedia) {
-        return Promise.reject(new Error('浏览器不支持 getUserMedia !'))
+        return Promise.reject(new Error('getUserMedia is not implemented in this browser'))
       }
 
       return new Promise((resolve, reject) => {

@@ -47,9 +47,10 @@ export class Recorder {
   }
 
   /**
-   * 开始录音
-   * @param onSuccess [采样率, 声道数]
-   * @param onError 错误信息
+   * Open recording
+   *
+   * @param onSuccess Promise<[sampleRate, numberOfChannels]>
+   * @param onError Error message
    */
   public open = async (onSuccess?: (value: [number, number]) => void, onError?: (msg: string) => void) => {
     await this.stop()
@@ -122,7 +123,7 @@ export class Recorder {
               resolve([sampleRate, resultChannels])
             }
             catch (error: any) {
-              reject(new Error(`录音开启失败：${error.code || error.name}`))
+              reject(new Error(`Error: $：${error.code || error.name}`))
             }
           },
           (error) => {
