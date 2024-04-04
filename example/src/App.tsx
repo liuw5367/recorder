@@ -158,7 +158,7 @@ function App() {
       </div>
 
       {devices.length > 0 && (
-        <div className="space-x-2">
+        <div className="space-x-2 flex flex-wrap justify-center items-center">
           <span>Audio input devices:</span>
           <select
             className="py-2 px-3 rounded"
@@ -176,25 +176,29 @@ function App() {
         </div>
       )}
 
-      <div className="space-x-2 flex items-center">
+      <div className="space-2 flex flex-col justify-center items-center">
         <span>{formatedDuration}</span>
-        <button onClick={handleStartClick} disabled={recording}>Start</button>
-        <button onClick={handlePauseClick} disabled={!recording || paused}>Pause</button>
-        <button onClick={handleResumeClick} disabled={!recording || !paused}>Resume</button>
-        <button onClick={handleStopClick} disabled={!recording}>Stop</button>
+        <div className="space-x-2 flex items-center flex-wrap">
+          <button onClick={handleStartClick} disabled={recording}>Start</button>
+          <button onClick={handlePauseClick} disabled={!recording || paused}>Pause</button>
+          <button onClick={handleResumeClick} disabled={!recording || !paused}>Resume</button>
+          <button onClick={handleStopClick} disabled={!recording}>Stop</button>
+        </div>
       </div>
 
       {wavUrl && (
-        <div className="space-x-2 flex items-center">
-          <span>duration:</span>
-          <span>{duration}</span>
-          <span>ms</span>
+        <div className="space-y-2 flex flex-col items-center">
+          <div>
+            <span>duration:</span>
+            <span>{duration}</span>
+            <span>ms</span>
+          </div>
           {wavUrl && <audio controls src={wavUrl} />}
         </div>
       )}
 
       {wavUrlList.length > 1 && (
-        <div className="space-x-2 flex">
+        <div className="space-x-2 flex flex-col">
           {wavUrlList.map((url, index) => (
             <div key={url} className="flex flex-col items-center">
               <div>
