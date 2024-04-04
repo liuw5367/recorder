@@ -1,8 +1,15 @@
 import { getErrorMessage, initUserMedia } from './browser'
-import { calculateAudioDuration } from './utils'
+import { calcPcmAbsSum, calcVolumePercentage, calculateAudioDuration } from './utils'
 
-export interface OnProgressListener {
+export interface OnAudioProcessListener {
   (bufferList: Float32Array[], sampleRate: number): void
+}
+
+export interface OnVolumeListener {
+  /**
+   * range from 0 to 100
+   */
+  (volume: number): void
 }
 
 export interface RecorderConfig {
@@ -22,9 +29,15 @@ export class Recorder {
 
   private stream?: MediaStream
 
-  private audioInput?: MediaStreamAudioSourceNode
+  private audioSourceStream?: MediaStreamAudioSourceNode
 
-  private onProgress?: OnProgressListener
+  private analyser?: AnalyserNode
+
+  private onAudioProcess?: OnAudioProcessListener
+
+  private onVolume?: OnVolumeListener
+
+  private byteFrequencyData?: Uint8Array
 
   private readonly config: RecorderConfig = {
     deviceId: undefined,
@@ -52,14 +65,13 @@ export class Recorder {
   /**
    * Open recording
    *
-   * @param onSuccess Promise<[sampleRate, numberOfChannels]>
-   * @param onError Error message
+   * @returns Promise<[number, number]> [sampleRate, numberOfChannels]
    */
-  public open = async (onSuccess?: (value: [number, number]) => void, onError?: (msg: string) => void) => {
+  public open = async (): Promise<[number, number]> => {
     await this.stop()
     this.reset()
 
-    const start = new Promise<[number, number]>((resolve, reject) => {
+    return new Promise<[number, number]>((resolve, reject) => {
       // @ts-expect-error webkitAudioContext
       const context = new (window.AudioContext || window.webkitAudioContext)()
       this.context = context
@@ -83,7 +95,9 @@ export class Recorder {
           list.push(new Float32Array(data))
         }
 
-        this.onProgress?.(list, this.config.sampleRate)
+        this.onAudioProcess?.(list, this.config.sampleRate)
+
+        this.onVolume?.(this.getVolume(list))
 
         this.dataLength += (list[0]?.length || 0)
 
@@ -111,15 +125,21 @@ export class Recorder {
           (stream) => {
             this.stream = stream
 
-            const audioInput = context.createMediaStreamSource(stream)
-            this.audioInput = audioInput
+            const audioSourceStream = context.createMediaStreamSource(stream)
+            this.audioSourceStream = audioSourceStream
 
-            const channelCount = audioInput.channelCount
+            const channelCount = audioSourceStream.channelCount
             const resultChannels = numberOfChannels < channelCount ? numberOfChannels : channelCount
             this.config.numberOfChannels = resultChannels
 
+            const analyser = context.createAnalyser()
+            this.analyser = analyser
+            audioSourceStream.connect(analyser)
+
+            analyser.connect(recorder)
+
             try {
-              audioInput.connect(recorder)
+              audioSourceStream.connect(recorder)
               recorder.connect(context.destination)
 
               const sampleRate = context.sampleRate
@@ -136,8 +156,10 @@ export class Recorder {
           },
         )
     })
+  }
 
-    start.then(onSuccess).catch(onError)
+  private getVolume = (buffers: Float32Array[]): number => {
+    return calcVolumePercentage(calcPcmAbsSum(buffers), buffers[0]?.length || 0)
   }
 
   public pause = () => {
@@ -152,8 +174,8 @@ export class Recorder {
     this.isPaused = false
     this.isStoped = true
 
-    this.audioInput?.disconnect()
-    this.audioInput = undefined
+    this.audioSourceStream?.disconnect()
+    this.audioSourceStream = undefined
 
     this.recorder?.disconnect()
     this.recorder = undefined
@@ -190,8 +212,12 @@ export class Recorder {
     return [...this.buffers]
   }
 
-  public setOnProgressListener = (listener?: OnProgressListener) => {
-    this.onProgress = listener
+  public setOnAudioProcessListener = (listener?: OnAudioProcessListener) => {
+    this.onAudioProcess = listener
+  }
+
+  public setOnVolumeListener = (listener?: OnVolumeListener) => {
+    this.onVolume = listener
   }
 
   public getDuration() {

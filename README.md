@@ -61,11 +61,13 @@ const recorder = new Recorder({
   deviceId: undefined,
 })
 
-recorder.open(([sampleRate, channels]) => {
-  console.log('channels:', channels, 'sampleRate:', sampleRate)
-}, (error) => {
-  alert(error)
-})
+recorder.open()
+    .then(([sampleRate, channels]) => {
+      console.log('channels:', channels, 'sampleRate:', sampleRate)
+    })
+    .catch((error) => {
+      alert(error)
+    })
 
 recorder.pause();
 recorder.resume();

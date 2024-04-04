@@ -23,6 +23,8 @@ function App() {
   const [duration, setDuration] = useState(0)
   const [formatedDuration, setFormatedDuration] = useState('00:00')
 
+  const [volume, setVolume] = useState(0)
+
   useEffect(() => {
     getDevices()
 
@@ -69,6 +71,7 @@ function App() {
 
   function handleStartClick() {
     setPaused(false)
+    setVolume(0)
     buffersRef.current = []
 
     console.log('start channels:', channels)
@@ -81,7 +84,7 @@ function App() {
     })
     recorderRef.current = recorder
 
-    recorder.setOnProgressListener((bufferList) => {
+    recorder.setOnAudioProcessListener((bufferList) => {
       if (buffersRef.current.length === 0) {
         buffersRef.current = bufferList.map((buffer) => [buffer])
       }
@@ -92,16 +95,19 @@ function App() {
       }
     })
 
-    recorder.open(([sampleRate, channels]) => {
-      console.log('channels:', channels, 'sampleRate:', sampleRate)
-      setSampleRate(sampleRate)
-      setRecording(true)
+    recorder.setOnVolumeListener(setVolume)
 
-      getDevices()
-    }, (error) => {
-      setRecording(false)
-      alert(error)
-    })
+    recorder.open()
+      .then(([sampleRate, channels]) => {
+        console.log('channels:', channels, 'sampleRate:', sampleRate)
+        setSampleRate(sampleRate)
+        setRecording(true)
+
+        getDevices()
+      }).catch((error) => {
+        setRecording(false)
+        alert(error)
+      })
   }
 
   function handlePauseClick() {
@@ -176,8 +182,16 @@ function App() {
         </div>
       )}
 
-      <div className="space-2 flex flex-col justify-center items-center">
-        <span>{formatedDuration}</span>
+      <div className="space-y-2 flex flex-col justify-center items-center">
+        <div>{formatedDuration}</div>
+
+        {recording && (
+          <div className="space-x-2">
+            <span>volume percentage:</span>
+            <span>{volume}</span>
+          </div>
+        )}
+
         <div className="space-x-2 flex items-center flex-wrap">
           <button onClick={handleStartClick} disabled={recording}>Start</button>
           <button onClick={handlePauseClick} disabled={!recording || paused}>Pause</button>

@@ -338,3 +338,80 @@ export function sampleRateConverterSimple(data: Uint8Array, inputSampleRate: num
   }
   return result
 }
+
+/**
+ * Convert multi-channel audio data to mono.
+ *
+ * @param {Float32Array[]} multiChannelData - Array of Float32Array representing multi-channel audio data
+ * @return {Float32Array} - Combined mono audio data
+ */
+export function convertToMono(multiChannelData: Float32Array[]): Float32Array {
+  const channels = multiChannelData.length
+  if (channels === 1) {
+    return multiChannelData[0]
+  }
+
+  const samples = multiChannelData[0].length
+
+  const monoData = new Float32Array(samples)
+
+  for (let i = 0; i < samples; i++) {
+    let sum = 0
+    for (let j = 0; j < channels; j++) {
+      sum += multiChannelData[j][i]
+    }
+    monoData[i] = sum / channels
+  }
+
+  return monoData
+}
+
+/**
+ * Calculate the absolute sum of the PCM values from the provided Float32Array buffers.
+ *
+ * @param {Float32Array[]} buffers - An array of Float32Array buffers containing PCM data.
+ * @return {number} The absolute sum of the PCM values.
+ */
+export function calcPcmAbsSum(buffers: Float32Array[]) {
+  const data = convertToMono(buffers)
+  const length = data.length
+
+  const pcm = new Int16Array(length)
+  let sum = 0
+
+  for (let j = 0; j < length; j++) {
+    // floatTo16BitPCM
+    const value = float32Value2Int16(data[j])
+    pcm[j] = value
+    sum += Math.abs(value)
+  };
+
+  return sum
+}
+
+/**
+ * A method to calculate the volume percentage.
+ *
+ * @param {number} pcmAbsSum - Sum of absolute values of all PCM Int16 samples
+ * @param {number} pcmLength - Length of PCM
+ * @return {number} 0-100, mainly used as a percentage
+ */
+export function calcVolumePercentage(pcmAbsSum: number, pcmLength: number) {
+  /* 计算音量 https://blog.csdn.net/jody1989/article/details/73480259
+  更高灵敏度算法:
+    限定最大感应值10000
+      线性曲线：低音量不友好
+        power/10000*100
+      对数曲线：低音量友好，但需限定最低感应值
+        (1+Math.log10(power/10000))*100
+  */
+  const power = (pcmAbsSum / pcmLength) || 0// NaN
+  let level
+  if (power < 1251) { // 1250的结果10%，更小的音量采用线性取值
+    level = Math.round(power / 1250 * 10)
+  }
+  else {
+    level = Math.round(Math.min(100, Math.max(0, (1 + Math.log(power / 10000) / Math.log(10)) * 100)))
+  };
+  return level
+}
